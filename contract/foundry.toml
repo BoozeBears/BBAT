@@ -1,0 +1,21 @@
+[profile.default]
+src = "src"
+out = "out"
+test = "test"
+libs = ["dependencies"]
+via_ir = true
+
+fs_permissions = [{ access = "read", path = "./"}]
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+
+[dependencies]
+"@openzeppelin-contracts" = { version = "5.0.2" }
+forge-std = { version = "1.8.2" }
+
+
+[rpc_endpoints]
+amoy = "${AMOY_RPC_URL}"
+
+[etherscan]
+amoy = { key = "${AMOY_ETHERSCAN_API_KEY}", chain = "amoy", url = "https://api-amoy.polygonscan.com/api?" }
