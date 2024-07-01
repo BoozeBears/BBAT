@@ -42,13 +42,9 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
         bbar = new BoozeBearsAllowanceDelegate();
 
         bbat.setRedirectContractAddress(address(bbar));
-
         bbat.setMerkleRoot(merkleRoot);
-        bbat.flipMintActiveState();
 
         vm.stopPrank();
-
-        skip(1704106800);
     }
 
     function test_BaseURI() external {
@@ -65,13 +61,14 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
      */
     function testFuzz_Mint(uint16 position) external {
         vm.assume(position < mints.length);
-        enableMintSchedule();
+
+        withinMintSchedule();
 
         mintToken(position);
     }
 
     function test_MintAll() external {
-        enableMintSchedule();
+        withinMintSchedule();
 
         for (uint256 i = 0; i < mints.length; i++) {
             mintToken(i);
@@ -79,7 +76,7 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
     }
 
     function test_BurnAll() external {
-        enableMintSchedule();
+        withinMintSchedule();
 
         for (uint256 i = 0; i < mints.length; i++) {
             mintToken(i);
@@ -94,7 +91,7 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
     }
 
     function test_MintWithDelegation() external {
-        enableMintSchedule();
+        withinMintSchedule();
 
         vm.startPrank(mints[0].owner, mints[0].owner);
         bbar.updateAllowanceReceiver(address(123));
@@ -104,54 +101,69 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
     }
 
     function test_ExpectRevert_MintPaused() external {
-        enableMintSchedule();
+        withinMintSchedule();
         pauseContract();
 
         vm.expectRevert(EnforcedPause.selector);
         mintToken(0);
+
+        unpauseContract();
     }
 
     function test_ExpectRevert_MintBeforeMintScheduleStart() external {
-        setMintSchedule();
+        beforeMintSchedule();
 
         vm.expectRevert(Errors.MintScheduleIsNotActive.selector);
         mintToken(0);
     }
 
-    function test_ExpectRevert_AfterBeforeMintScheduleStart() external {
-        setMintSchedule();
+    function test_ExpectRevert_MintAfterMintScheduleStart() external {
+        afterMintSchedule();
 
         vm.expectRevert(Errors.MintScheduleIsNotActive.selector);
         mintToken(0);
     }
 
     function test_MintScheduleActive() external {
-        enableMintSchedule();
+        withinMintSchedule();
 
         mintToken(0);
     }
 
     function test_TotalSupply() external {
         assertEq(0, bbat.totalSupply());
-        enableMintSchedule();
+        withinMintSchedule();
         mintToken(0);
 
         assertEq(3, bbat.totalSupply());
     }
 
     function test_BurnOwned() external {
-        enableMintSchedule();
-
+        withinMintSchedule();
         mintToken(0);
+
+        withinClaimSchedule();
         vm.startPrank(mints[0].owner);
         bbat.burnWithHash(mints[0].tokenIds, bytes32("Some Hash"));
         vm.stopPrank();
     }
 
-    function test_ExpectRevert_BurnNonOwned() external {
-        enableMintSchedule();
-
+    function test_burnOne() external {
+        withinMintSchedule();
         mintToken(0);
+
+        withinClaimSchedule();
+        vm.startPrank(admin);
+        bbat.burnOne(mints[0].tokenIds[0]);
+        vm.stopPrank();
+    }
+
+    function test_ExpectRevert_BurnNonOwned() external {
+        withinMintSchedule();
+        mintToken(0);
+
+        withinClaimSchedule();
+
         vm.startPrank(mints[1].owner);
         vm.expectRevert(abi.encodeWithSelector(Errors.NotAuthorizedForToken.selector, mints[0].tokenIds[0]));
         bbat.burnWithHash(mints[0].tokenIds, bytes32("Some Hash"));
@@ -159,34 +171,40 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
     }
 
     function test_ExpectRevert_MintWithInvalidProofs() external {
-        enableMintSchedule();
+        withinMintSchedule();
 
         vm.startPrank(mints[0].owner, mints[0].owner);
-        vm.expectRevert(abi.encodeWithSelector(Errors.SenderNotWhitelisted.selector, mints[0].owner, mints[0].tokenIds[0]));
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.SenderNotWhitelisted.selector, mints[0].owner, mints[0].tokenIds[0])
+        );
         bbat.mint(mints[1].proofs, mints[0].tokenIds, address(0));
         vm.stopPrank();
     }
 
     function test_ExpectRevert_MintNotOnAllowlist() external {
-        enableMintSchedule();
+        withinMintSchedule();
 
         vm.startPrank(address(123), address(123));
-        vm.expectRevert(abi.encodeWithSelector(Errors.SenderNotWhitelisted.selector, address(123), mints[0].tokenIds[0]));
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.SenderNotWhitelisted.selector, address(123), mints[0].tokenIds[0])
+        );
         bbat.mint(mints[1].proofs, mints[0].tokenIds, address(0));
         vm.stopPrank();
     }
 
     function test_ExpectRevert_MintVaultNotOnAllowlist() external {
-        enableMintSchedule();
+        withinMintSchedule();
 
         vm.startPrank(address(123), address(123));
-        vm.expectRevert(abi.encodeWithSelector(Errors.VaultNotWhitelisted.selector, address(12345), mints[0].tokenIds[0]));
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.VaultNotWhitelisted.selector, address(12345), mints[0].tokenIds[0])
+        );
         bbat.mint(mints[1].proofs, mints[0].tokenIds, address(12345));
         vm.stopPrank();
     }
 
     function test_ExpectRevert_MintNotDelegated() external {
-        enableMintSchedule();
+        withinMintSchedule();
 
         vm.startPrank(address(123), address(123));
         vm.expectRevert(
@@ -194,21 +212,6 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
         );
         bbat.mint(mints[1].proofs, mints[1].tokenIds, mints[1].owner);
         vm.stopPrank();
-    }
-
-    function setMintSchedule() internal {
-        setMintSchedule(1718661600, 1721253600);
-    }
-
-    function setMintSchedule(uint256 _start, uint256 _end) internal {
-        vm.startPrank(admin);
-        bbat.setMintSchedule(_start, _end);
-        vm.stopPrank();
-    }
-
-    function enableMintSchedule() internal {
-        setMintSchedule();
-        skip(14554801);
     }
 
     function unpauseContract() internal {
@@ -232,6 +235,60 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
     function mintTokenWithDelegation(uint256 position, address sender, address _vault) internal {
         vm.startPrank(sender, sender);
         bbat.mint(mints[position].proofs, mints[position].tokenIds, _vault);
+        vm.stopPrank();
+    }
+
+    function withinMintSchedule() internal {
+        vm.startPrank(admin);
+        vm.warp(0);
+        bbat.setMintSchedule(1704099600, 1706778000);
+        skip(1705222800);
+        bbat.flipMintActiveState();
+        vm.assertTrue(bbat.isMintActive());
+        vm.stopPrank();
+    }
+
+    function beforeMintSchedule() internal {
+        vm.startPrank(admin);
+        vm.warp(0);
+        bbat.setMintSchedule(1704099600, 1706778000);
+        skip(1701421200);
+        bbat.flipMintActiveState();
+        vm.assertTrue(bbat.isMintActive());
+        vm.stopPrank();
+    }
+
+    function afterMintSchedule() internal {
+        vm.startPrank(admin);
+        vm.warp(0);
+        bbat.setMintSchedule(1704099600, 1706778000);
+        skip(1709283600);
+        bbat.flipMintActiveState();
+        vm.assertTrue(bbat.isMintActive());
+        vm.stopPrank();
+    }
+
+    function withinClaimSchedule() internal {
+        vm.startPrank(admin);
+        vm.warp(0);
+        bbat.setClaimSchedule(1704099600, 1706778000);
+        skip(1705222800);
+        vm.stopPrank();
+    }
+
+    function beforeClaimSchedule() internal {
+        vm.startPrank(admin);
+        vm.warp(0);
+        bbat.setClaimSchedule(1704099600, 1706778000);
+        skip(1701421200);
+        vm.stopPrank();
+    }
+
+    function afterClaimSchedule() internal {
+        vm.startPrank(admin);
+        vm.warp(0);
+        bbat.setClaimSchedule(1704099600, 1706778000);
+        skip(1709283600);
         vm.stopPrank();
     }
 }

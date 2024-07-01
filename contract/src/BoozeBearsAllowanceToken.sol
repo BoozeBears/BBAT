@@ -265,8 +265,8 @@ contract BoozeBearsAllowanceToken is
      */
     function setClaimSchedule(uint256 _start, uint256 _end) external onlyRole(ADMIN_ROLE) {
         require(_end >= _start || _start == 0 || _end == 0, Errors.InvalidClaimSchedule(_start, _end));
-        mintSchedule.start = _start;
-        mintSchedule.end = _end;
+        claimSchedule.start = _start;
+        claimSchedule.end = _end;
     }
 
     /**
@@ -335,8 +335,8 @@ contract BoozeBearsAllowanceToken is
      */
     modifier _checkClaimSchedule() virtual {
         require(
-            (claimSchedule.start == 0 || claimSchedule.start <= block.timestamp)
-                && (claimSchedule.end == 0 || claimSchedule.end >= block.timestamp),
+            (claimSchedule.start > 0 && claimSchedule.start <= block.timestamp)
+                && (claimSchedule.end > 0 && claimSchedule.end >= block.timestamp),
             Errors.ClaimScheduleIsNotActive()
         );
         _;
