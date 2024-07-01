@@ -4,6 +4,7 @@ out = "out"
 test = "test"
 libs = ["dependencies"]
 via_ir = true
+gas_limit = 9223372036854775807
 
 fs_permissions = [{ access = "read", path = "./"}]
 
