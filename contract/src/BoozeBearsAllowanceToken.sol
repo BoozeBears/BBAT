@@ -148,7 +148,9 @@ contract BoozeBearsAllowanceToken is
                     Errors.SenderNotWhitelisted(msg.sender, _tokenIds[i])
                 );
             } else {
-                require(_verifyWhitelist(_proofs[i], _tokenIds[i], _vault), Errors.VaultNotWhitelisted(_vault, _tokenIds[i]));
+                require(
+                    _verifyWhitelist(_proofs[i], _tokenIds[i], _vault), Errors.VaultNotWhitelisted(_vault, _tokenIds[i])
+                );
 
                 address delegateAddress = delegateContract.getAllowanceReceiver(_vault, _tokenIds[i]);
                 require(delegateAddress == msg.sender, Errors.NotDelegated(msg.sender, _vault, _tokenIds[i]));

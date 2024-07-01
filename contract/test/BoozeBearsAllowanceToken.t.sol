@@ -214,6 +214,20 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
         vm.stopPrank();
     }
 
+    function test_ExpectRevert_InvalidMintSchedule() external {
+        vm.startPrank(admin);
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidMintSchedule.selector, 1706778000, 1704099600));
+        bbat.setMintSchedule(1706778000, 1704099600);
+        vm.stopPrank();
+    }
+
+    function test_ExpectRevert_InvalidClaimSchedule() external {
+        vm.startPrank(admin);
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidClaimSchedule.selector, 1706778000, 1704099600));
+        bbat.setClaimSchedule(1706778000, 1704099600);
+        vm.stopPrank();
+    }
+
     function unpauseContract() internal {
         vm.startPrank(admin);
         bbat.unpause();
