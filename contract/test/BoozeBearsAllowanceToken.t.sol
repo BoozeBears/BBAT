@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.26;
 
 import {Test, console} from "@forge-std-1.8.2/src/Test.sol";
 import {BoozeBearsAllowanceToken} from "../src/BoozeBearsAllowanceToken.sol";
+import {BoozeBearsAllowanceDelegate} from "../src/BoozeBearsAllowanceDelegate.sol";
 import {Utils} from "./utils/Utils.sol";
 import {Pausable} from "@openzeppelin-contracts-5.0.2/utils/Pausable.sol";
 import "../src/Errors.sol";
@@ -10,6 +11,7 @@ import "../src/Errors.sol";
 contract BoozeBearsAllowanceTokenTest is Test, Pausable {
     Utils internal utils;
     BoozeBearsAllowanceToken internal bbat;
+    BoozeBearsAllowanceDelegate internal bbar;
 
     struct Mint {
         address owner;
@@ -37,11 +39,16 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
         assertEq(bbat.name(), "BoozeBearsAllowanceToken");
         assertEq(bbat.symbol(), "BBAT");
 
-        bbat.setMerkleRoot(merkleRoot);
+        bbar = new BoozeBearsAllowanceDelegate();
 
+        bbat.setRedirectContractAddress(address(bbar));
+
+        bbat.setMerkleRoot(merkleRoot);
         bbat.flipMintActiveState();
 
         vm.stopPrank();
+
+        skip(1704106800);
     }
 
     function test_BaseURI() external {
@@ -50,6 +57,17 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
         vm.stopPrank();
 
         assertEq(bbat.baseURI(), "https://boozebears.io/");
+    }
+
+    /**
+     * forge-config: default.fuzz.runs = 3333
+     * forge-config: default.fuzz.max-test-rejects = 500
+     */
+    function testFuzz_Mint(uint16 position) external {
+        vm.assume(position < mints.length);
+        enableMintSchedule();
+
+        mintToken(position);
     }
 
     function test_MintAll() external {
@@ -73,6 +91,16 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
         vm.stopPrank();
 
         assertEq(0, bbat.totalSupply());
+    }
+
+    function test_MintWithDelegation() external {
+        enableMintSchedule();
+
+        vm.startPrank(mints[0].owner, mints[0].owner);
+        bbar.updateAllowanceReceiver(address(123));
+        vm.stopPrank();
+
+        mintTokenWithDelegation(0, address(123), mints[0].owner);
     }
 
     function test_ExpectRevert_MintPaused() external {
@@ -111,14 +139,6 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
         assertEq(3, bbat.totalSupply());
     }
 
-    function test_MintOnlyToOwner() external {
-        enableMintSchedule();
-
-        vm.startPrank(mints[1].owner, mints[1].owner);
-        bbat.mint(mints[0].proofs, mints[0].tokenIds, mints[0].owner);
-        vm.stopPrank();
-    }
-
     function test_BurnOwned() external {
         enableMintSchedule();
 
@@ -138,21 +158,41 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
         vm.stopPrank();
     }
 
-    function test_ExpectRevert_MintNotToOwner() external {
-        enableMintSchedule();
-
-        vm.startPrank(mints[1].owner, mints[1].owner);
-        vm.expectRevert(abi.encodeWithSelector(Errors.NotWhitelisted.selector, mints[1].owner, mints[1].owner, mints[0].tokenIds[0]));
-        bbat.mint(mints[0].proofs, mints[0].tokenIds, mints[1].owner);
-        vm.stopPrank();
-    }
-
     function test_ExpectRevert_MintWithInvalidProofs() external {
         enableMintSchedule();
 
         vm.startPrank(mints[0].owner, mints[0].owner);
-        vm.expectRevert(abi.encodeWithSelector(Errors.NotWhitelisted.selector, mints[0].owner, mints[0].owner, mints[0].tokenIds[0]));
-        bbat.mint(mints[1].proofs, mints[0].tokenIds, mints[0].owner);
+        vm.expectRevert(abi.encodeWithSelector(Errors.SenderNotWhitelisted.selector, mints[0].owner, mints[0].tokenIds[0]));
+        bbat.mint(mints[1].proofs, mints[0].tokenIds, address(0));
+        vm.stopPrank();
+    }
+
+    function test_ExpectRevert_MintNotOnAllowlist() external {
+        enableMintSchedule();
+
+        vm.startPrank(address(123), address(123));
+        vm.expectRevert(abi.encodeWithSelector(Errors.SenderNotWhitelisted.selector, address(123), mints[0].tokenIds[0]));
+        bbat.mint(mints[1].proofs, mints[0].tokenIds, address(0));
+        vm.stopPrank();
+    }
+
+    function test_ExpectRevert_MintVaultNotOnAllowlist() external {
+        enableMintSchedule();
+
+        vm.startPrank(address(123), address(123));
+        vm.expectRevert(abi.encodeWithSelector(Errors.VaultNotWhitelisted.selector, address(12345), mints[0].tokenIds[0]));
+        bbat.mint(mints[1].proofs, mints[0].tokenIds, address(12345));
+        vm.stopPrank();
+    }
+
+    function test_ExpectRevert_MintNotDelegated() external {
+        enableMintSchedule();
+
+        vm.startPrank(address(123), address(123));
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.NotDelegated.selector, address(123), mints[1].owner, mints[1].tokenIds[0])
+        );
+        bbat.mint(mints[1].proofs, mints[1].tokenIds, mints[1].owner);
         vm.stopPrank();
     }
 
@@ -168,7 +208,7 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
 
     function enableMintSchedule() internal {
         setMintSchedule();
-        skip(1718661601);
+        skip(14554801);
     }
 
     function unpauseContract() internal {
@@ -184,19 +224,14 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
     }
 
     function mintToken(uint256 position) internal {
-        /*for (uint256 i = 0; i < mints[position].tokenIds.length; i++) {
-      console.log("Owner: %s | TokenId: %d", mints[position].owner, mints[position].tokenIds[i]);
-      for (uint256 j = 0; j < mints[position].proofs[i].length; j++){
-        console.logBytes32(mints[position].proofs[i][j]);
-      }
-    }*/
-
-        //uint256 totalSupply = bbat.totalSupply();
-
         vm.startPrank(mints[position].owner, mints[position].owner);
-        bbat.mint(mints[position].proofs, mints[position].tokenIds, mints[position].owner);
+        bbat.mint(mints[position].proofs, mints[position].tokenIds, address(0));
         vm.stopPrank();
+    }
 
-        //assertEq(totalSupply + mints[position].tokenIds.length, bbat.totalSupply());
+    function mintTokenWithDelegation(uint256 position, address sender, address _vault) internal {
+        vm.startPrank(sender, sender);
+        bbat.mint(mints[position].proofs, mints[position].tokenIds, _vault);
+        vm.stopPrank();
     }
 }

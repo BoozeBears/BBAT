@@ -1,13 +1,9 @@
-## Foundry
+# Booze Bears Allowance Token
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+## Who can Mint?
 
-Foundry consists of:
-
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+- Owner of a Booze Bear Token to own wallet
+- RedirectionWallet when Owner of redirection is part of MerkleTree for the specific token
 
 ## Documentation
 
@@ -48,9 +44,9 @@ $ anvil
 ### Deploy
 
 ```shell
-$ forge script script/NFT.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+$ forge script script/BoozeBearsAllowanceToken.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
 
-$ forge script --chain amoy script/NFT.s.sol:NFTScript --rpc-url $AMOY_RPC_URL --broadcast -vvvv
+$ forge script --chain amoy script/BoozeBearsAllowanceToken.sol:NFTScript --rpc-url $AMOY_RPC_URL --broadcast -vvvv
 ```
 
 ### Cast

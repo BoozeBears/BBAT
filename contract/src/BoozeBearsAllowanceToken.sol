@@ -11,6 +11,7 @@ import "@openzeppelin-contracts-5.0.2/token/ERC721/ERC721.sol";
 import "@openzeppelin-contracts-5.0.2/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin-contracts-5.0.2/utils/ReentrancyGuard.sol";
 import "./Errors.sol";
+import "./BoozeBearsAllowanceDelegate.sol";
 
 contract BoozeBearsAllowanceToken is
     ERC721,
@@ -45,6 +46,16 @@ contract BoozeBearsAllowanceToken is
     bool public isMintActive = false;
 
     /**
+     * @notice Token redirect contract
+     */
+    address public delegateContractAddress;
+
+    /**
+     * @notice Reference to BoozeBearsAllowanceDelegate.sol contract
+     */
+    BoozeBearsAllowanceDelegate private delegateContract;
+
+    /**
      * @dev MintSchedule defines start and end of the mint period
      */
     struct MintSchedule {
@@ -53,13 +64,30 @@ contract BoozeBearsAllowanceToken is
     }
 
     /**
-     * @notice MintSchedule defines start and end of the mint period.
+     * @dev ClaimSchedule defines start and end of the claim period
+     */
+    struct ClaimSchedule {
+        uint256 start;
+        uint256 end;
+    }
+
+    /**
+     * @notice mintSchedule defines start and end of the mint period.
      */
     MintSchedule public mintSchedule;
 
+    /**
+     * @notice claimSchedule defines start and end of the claim period
+     */
+    ClaimSchedule public claimSchedule;
 
-
-    constructor(string memory name, string memory symbol) ERC721(name, symbol) {
+    /**
+     * @dev Create new contract
+     *
+     * @param _name Name of this contract
+     * @param _symbol Symbol of this contract
+     */
+    constructor(string memory _name, string memory _symbol) ERC721(_name, _symbol) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(BURN_ALL_ROLE, msg.sender);
         _grantRole(BURN_ONE_ROLE, msg.sender);
@@ -97,50 +125,86 @@ contract BoozeBearsAllowanceToken is
     /**
      * @notice Mint a new token.
      *
-     * @param proofs Merkle proof for whitelist verification for each tokenId.
-     * @param tokenIds The tokens which should be minted.
-     * @param to The address to mint the token to.
+     * @param _proofs Merkle proof for whitelist verification for each tokenId.
+     * @param _tokenIds The tokens which should be minted.
+     * @param _vault Wallet address which owns the token.
      *
      * Requirements:
      * - block.timestamp must within mint schedule
      * - proofs must be verified
      * - destination can't be 0
      */
-    function mint(bytes32[][] calldata proofs, uint256[] calldata tokenIds, address to)
+    function mint(bytes32[][] calldata _proofs, uint256[] calldata _tokenIds, address _vault)
         external
-        payable
         _checkMintActive
         _checkMintSchedule
-        _verifyProof(proofs, tokenIds, to)
+        _requireValidAddress(delegateContractAddress)
     {
-        require(to != address(0), Errors.DestinationAddressRequired(to));
+        uint256 len = _tokenIds.length;
+        for (uint256 i = 0; i < len;) {
+            if (_vault == address(0)) {
+                require(
+                    _verifyWhitelist(_proofs[i], _tokenIds[i], msg.sender),
+                    Errors.SenderNotWhitelisted(msg.sender, _tokenIds[i])
+                );
+            } else {
+                require(_verifyWhitelist(_proofs[i], _tokenIds[i], _vault), Errors.VaultNotWhitelisted(_vault, _tokenIds[i]));
 
-        for (uint256 i = 0; i < tokenIds.length; i++) {
-            _safeMint(to, tokenIds[i]);
+                address delegateAddress = delegateContract.getAllowanceReceiver(_vault, _tokenIds[i]);
+                require(delegateAddress == msg.sender, Errors.NotDelegated(msg.sender, _vault, _tokenIds[i]));
+            }
+            _safeMint(msg.sender, _tokenIds[i]);
+
+            unchecked {
+                ++i;
+            }
         }
     }
 
     /**
      * @notice Burn multiple tokens
      *
-     * @param tokenIds TokenIds which should be burned
+     * @param _tokenIds TokenIds which should be burned
      *
      * Requirements:
      * - must be authorized for all tokenIds
      */
-    function burnWithHash(uint256[] calldata tokenIds, bytes32) external _checkAuthorizations(tokenIds) {
-        for (uint256 i = 0; i < tokenIds.length; i++) {
-            super._burn(tokenIds[i]);
+    function burnWithHash(uint256[] calldata _tokenIds, bytes32)
+        external
+        _checkClaimSchedule
+        _checkAuthorizations(_tokenIds)
+    {
+        uint256 len = _tokenIds.length;
+        for (uint256 i = 0; i < len;) {
+            super._burn(_tokenIds[i]);
+
+            unchecked {
+                ++i;
+            }
         }
+    }
+
+    /**
+     * @dev Burn one token
+     *
+     * @param _tokenId TokenId to burn
+     */
+    function burnOne(uint256 _tokenId) external onlyRole(BURN_ONE_ROLE) {
+        _burn(_tokenId);
     }
 
     /**
      * @dev Burn all tokens
      */
     function burnAll() external onlyRole(BURN_ALL_ROLE) {
-        for (uint256 i = totalSupply(); i > 0; i--) {
+        uint256 totalSupply = totalSupply();
+        for (uint256 i = totalSupply; i > 0;) {
             uint256 tokenId = tokenByIndex(i - 1);
             _burn(tokenId);
+
+            unchecked {
+                --i;
+            }
         }
     }
 
@@ -157,10 +221,10 @@ contract BoozeBearsAllowanceToken is
     /**
      * @dev Set BaseURI
      *
-     * @param baseURI_ baseURI to persist
+     * @param _baseURI_ baseURI to persist
      */
-    function setBaseURI(string calldata baseURI_) external onlyRole(ADMIN_ROLE) {
-        baseURI = baseURI_;
+    function setBaseURI(string calldata _baseURI_) external onlyRole(ADMIN_ROLE) {
+        baseURI = _baseURI_;
     }
 
     /**
@@ -173,9 +237,11 @@ contract BoozeBearsAllowanceToken is
     /**
      * @notice Get token metadata URI
      * @dev See {IERC721Metadata-tokenURI}.
+     *
+     * @param _tokenId Token ID
      */
-    function tokenURI(uint256 tokenId) public view override(ERC721) returns (string memory) {
-        string memory _tokenURI = super.tokenURI(tokenId);
+    function tokenURI(uint256 _tokenId) public view override(ERC721) returns (string memory) {
+        string memory _tokenURI = super.tokenURI(_tokenId);
         return bytes(_tokenURI).length > 0 ? string(abi.encodePacked(_tokenURI, ".json")) : "";
     }
 
@@ -192,10 +258,56 @@ contract BoozeBearsAllowanceToken is
     }
 
     /**
+     * @dev set claim schedule
+     *
+     * @param _start Timestamp to mark the start
+     * @param _end Timestamp to mark the end
+     */
+    function setClaimSchedule(uint256 _start, uint256 _end) external onlyRole(ADMIN_ROLE) {
+        require(_end >= _start || _start == 0 || _end == 0, Errors.InvalidClaimSchedule(_start, _end));
+        mintSchedule.start = _start;
+        mintSchedule.end = _end;
+    }
+
+    /**
      * @dev flip mint active state
      */
     function flipMintActiveState() external onlyRole(ADMIN_ROLE) {
         isMintActive = !isMintActive;
+    }
+
+    /**
+     * @dev Set redirect contract address
+     */
+    function setRedirectContractAddress(address addr) external onlyRole(ADMIN_ROLE) {
+        delegateContractAddress = addr;
+        delegateContract = BoozeBearsAllowanceDelegate(addr);
+    }
+
+    /**
+     * @dev Verify whitelist for msg.sender
+     *
+     * @param _proof Proof for MerkleTree
+     * @param _tokenId tokenId which should be verified
+     * @param _address address which should be verified
+     */
+    function _verifyWhitelist(bytes32[] calldata _proof, uint256 _tokenId, address _address)
+        internal
+        view
+        returns (bool)
+    {
+        if (_verify(_proof, _getLeaf(_address, _tokenId))) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @dev Check if address is valid ( != 0 )
+     */
+    modifier _requireValidAddress(address _addr) virtual {
+        require(_addr != address(0), Errors.InvalidAddress(_addr));
+        _;
     }
 
     /**
@@ -207,30 +319,25 @@ contract BoozeBearsAllowanceToken is
     }
 
     /**
-     * @dev Verify proof for either msg.sender or the to address
-     *
-     * @param proofs Proof for each tokenId
-     * @param tokenIds tokenIds which should be verified
-     * @param to Address which should receive the Tokens
-     */
-    modifier _verifyProof(bytes32[][] calldata proofs, uint256[] calldata tokenIds, address to) virtual {
-        for (uint256 i = 0; i < tokenIds.length; i++) {
-            require(
-                _verify(proofs[i], _leaf(msg.sender, tokenIds[i])) || _verify(proofs[i], _leaf(to, tokenIds[i])),
-              Errors.NotWhitelisted(msg.sender, to, tokenIds[i])
-            );
-        }
-        _;
-    }
-
-    /**
      * @dev Check if current block.timestamp is within our mint schedule
      */
     modifier _checkMintSchedule() virtual {
         require(
             (mintSchedule.start == 0 || mintSchedule.start <= block.timestamp)
                 && (mintSchedule.end == 0 || mintSchedule.end >= block.timestamp),
-          Errors.MintScheduleIsNotActive()
+            Errors.MintScheduleIsNotActive()
+        );
+        _;
+    }
+
+    /**
+     * @dev Check if current block.timestamp is within our claim schedule
+     */
+    modifier _checkClaimSchedule() virtual {
+        require(
+            (claimSchedule.start == 0 || claimSchedule.start <= block.timestamp)
+                && (claimSchedule.end == 0 || claimSchedule.end >= block.timestamp),
+            Errors.ClaimScheduleIsNotActive()
         );
         _;
     }
@@ -238,9 +345,16 @@ contract BoozeBearsAllowanceToken is
     /**
      * @dev Check if msg.sender is owner or Authorized
      */
-    modifier _checkAuthorizations(uint256[] calldata tokenIds) virtual {
-        for (uint256 i = 0; i < tokenIds.length; i++) {
-            require(_isAuthorized(_ownerOf(tokenIds[i]), msg.sender, tokenIds[i]), Errors.NotAuthorizedForToken(tokenIds[i]));
+    modifier _checkAuthorizations(uint256[] calldata _tokenIds) virtual {
+        uint256 len = _tokenIds.length;
+        for (uint256 i = 0; i < len;) {
+            require(
+                _isAuthorized(_ownerOf(_tokenIds[i]), msg.sender, _tokenIds[i]),
+                Errors.NotAuthorizedForToken(_tokenIds[i])
+            );
+            unchecked {
+                ++i;
+            }
         }
         _;
     }
@@ -248,21 +362,21 @@ contract BoozeBearsAllowanceToken is
     /**
      * @dev Verify MerkleProof
      *
-     * @param proof Proof to verify
-     * @param leaf Precalculated leaf to verify against proof
+     * @param _proof Proof to verify
+     * @param _leaf Precalculated leaf to verify against proof
      */
-    function _verify(bytes32[] calldata proof, bytes32 leaf) internal view returns (bool) {
-        return MerkleProof.verify(proof, merkleRoot, leaf);
+    function _verify(bytes32[] calldata _proof, bytes32 _leaf) internal view returns (bool) {
+        return MerkleProof.verify(_proof, merkleRoot, _leaf);
     }
 
     /**
      * @dev Calculate MerkleProof leaf
      *
-     * @param owner Owner used to calculate the leaf
-     * @param tokenId TokenID used to calculate the leaf
+     * @param _owner Owner used to calculate the leaf
+     * @param _tokenId TokenID used to calculate the leaf
      */
-    function _leaf(address owner, uint256 tokenId) internal pure returns (bytes32) {
-        return keccak256(bytes.concat(keccak256(abi.encode(owner, tokenId))));
+    function _getLeaf(address _owner, uint256 _tokenId) internal pure returns (bytes32) {
+        return keccak256(bytes.concat(keccak256(abi.encode(_owner, _tokenId))));
     }
 
     /**

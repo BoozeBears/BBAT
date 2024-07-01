@@ -9,6 +9,8 @@ fs_permissions = [{ access = "read", path = "./"}]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 
+solc_version = "0.8.26"
+
 [dependencies]
 "@openzeppelin-contracts" = { version = "5.0.2" }
 forge-std = { version = "1.8.2" }

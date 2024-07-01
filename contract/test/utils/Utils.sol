@@ -4,14 +4,14 @@ pragma solidity >=0.8.0;
 import {Test} from "@forge-std-1.8.2/src/Test.sol";
 
 contract Utils is Test {
-  bytes32 internal nextUser = keccak256(abi.encodePacked("user address"));
+    bytes32 internal nextUser = keccak256(abi.encodePacked("user address"));
 
-  function getNextUserAddress() external returns (address payable) {
-    //bytes32 to address conversion
-    address payable user = payable(address(uint160(uint256(nextUser))));
-    nextUser = keccak256(abi.encodePacked(nextUser));
-    return user;
-  }
+    function getNextUserAddress() external returns (address payable) {
+        //bytes32 to address conversion
+        address payable user = payable(address(uint160(uint256(nextUser))));
+        nextUser = keccak256(abi.encodePacked(nextUser));
+        return user;
+    }
 
     // create users with 100 ETH balance each
     function createUsers(uint256 userNum) external returns (address payable[] memory) {
