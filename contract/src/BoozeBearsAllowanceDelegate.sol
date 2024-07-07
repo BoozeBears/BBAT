@@ -2,8 +2,9 @@
 pragma solidity ^0.8.26;
 
 import "@openzeppelin-contracts-5.0.2/utils/structs/EnumerableSet.sol";
+import "./IBoozeBearsErrors.sol";
 
-contract BoozeBearsAllowanceDelegate {
+contract BoozeBearsAllowanceDelegate is IBoozeBearsErrors {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /**
@@ -23,7 +24,7 @@ contract BoozeBearsAllowanceDelegate {
      *
      * @param receiver address for delegation
      */
-    function setDelegation(address receiver) external {
+    function setDelegation(address receiver) external noContractCalls {
         delegationSenderReceiverMapping[msg.sender] = receiver;
         delegationReceiverSendersMapping[receiver].add(msg.sender);
     }
@@ -31,7 +32,7 @@ contract BoozeBearsAllowanceDelegate {
     /**
      * @notice Reset delegation
      */
-    function resetDelegation() external {
+    function resetDelegation() external noContractCalls {
         address delegatedTo = delegationSenderReceiverMapping[msg.sender];
 
         delete delegationSenderReceiverMapping[msg.sender];
@@ -39,12 +40,12 @@ contract BoozeBearsAllowanceDelegate {
     }
 
     /**
-     * @notice Get delegation receiver for holder
+     * @notice Get delegation receiver for sender
      *
-     * @param holder address
+     * @param sender address
      */
-    function getDelegationReceiver(address holder) external view returns (address) {
-        return delegationSenderReceiverMapping[holder];
+    function getDelegationReceiver(address sender) external view returns (address) {
+        return delegationSenderReceiverMapping[sender];
     }
 
     /**
@@ -55,9 +56,26 @@ contract BoozeBearsAllowanceDelegate {
     }
 
     /**
+     * @notice Get delegation senders for receiver
+     *
+     * @param receiver address
+     */
+    function getDelegationSenders(address receiver) external view returns (address[] memory) {
+        return delegationReceiverSendersMapping[receiver].values();
+    }
+
+    /**
      * @notice Get delegation senders for msg.sender
      */
     function getDelegationSenders() external view returns (address[] memory) {
-        return delegationReceiverSendersMapping[msg.sender].values();
+      return delegationReceiverSendersMapping[msg.sender].values();
+    }
+
+    /**
+     * @dev do not allow to be called from another contract
+     */
+    modifier noContractCalls() virtual {
+      require(msg.sender == tx.origin, BoozeBearsNoCallsFromOtherContract());
+      _;
     }
 }
