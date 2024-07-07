@@ -13,16 +13,16 @@ const boozeBearContract = '0x701b2E775a82dbF50bd80a22a0d32EB13Fb81825'
 const alchemy = new Alchemy(config);
 
 
-const getHolders = async () => {
+const getHolders = async (blockNumber: string) => {
   return await alchemy.nft.getOwnersForContract(boozeBearContract, {
     withTokenBalances: true,
-    block: "20149297",
+    block: blockNumber,
   });
 }
 
 
 async function main() {
-  const holders = await getHolders();
+  const holders = await getHolders("20149297");
 
   let values = [];
   for (const holder of holders.owners) {
@@ -52,25 +52,6 @@ async function main() {
   }
 
   fs.writeFileSync("merkle-mints.json", JSON.stringify(mints));
-
-  const maxLeafs = 10;
-  let currentLeafs = 0;
-  let proofs: {leafs: {}[]} = {leafs: []}; //address: string, leaf: string, proofs: string[], tokenId: string
-  for (const value of values) {
-    const proof = {
-      address: value[0],
-      leaf: tree.leafHash(value),
-      proofs: tree.getProof(value),
-      tokenId: parseInt(value[1]),
-    }
-    proofs.leafs.push(proof);
-    currentLeafs++;
-
-    if (currentLeafs >= maxLeafs) {
-      break
-    }
-  }
-  fs.writeFileSync("merkle-proofs.json", JSON.stringify(proofs));
 }
 
 main()
