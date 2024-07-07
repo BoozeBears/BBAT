@@ -42,7 +42,7 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
 
         bbar = new BoozeBearsAllowanceDelegate();
 
-        bbat.setRedirectContractAddress(address(bbar));
+        bbat.setDelegateContractAddress(address(bbar));
         bbat.setMerkleRoot(merkleRoot);
 
         vm.stopPrank();

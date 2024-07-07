@@ -313,9 +313,9 @@ contract BoozeBearsAllowanceToken is
     }
 
     /**
-     * @dev Set redirect contract address
+     * @dev Set delegate contract address
      */
-    function setRedirectContractAddress(address addr) external onlyRole(ADMIN_ROLE) {
+    function setDelegateContractAddress(address addr) external onlyRole(ADMIN_ROLE) {
         delegateContractAddress = addr;
         delegateContract = BoozeBearsAllowanceDelegate(addr);
     }
