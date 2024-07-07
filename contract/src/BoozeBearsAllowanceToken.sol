@@ -27,6 +27,8 @@ contract BoozeBearsAllowanceToken is
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
+    bytes32 public constant MINT_PHASE_ROLE = keccak256("MINT_PHASE_ROLE");
+    bytes32 public constant BURN_PHASE_ROLE = keccak256("BURN_PHASE_ROLE");
     bytes32 public constant BURN_ALL_ROLE = keccak256("BURN_ALL_ROLE");
     bytes32 public constant BURN_ONE_ROLE = keccak256("BURN_ONE_ROLE");
     bytes32 public constant WITHDRAW_ROLE = keccak256("WITHDRAW_ROLE");
@@ -96,11 +98,14 @@ contract BoozeBearsAllowanceToken is
      */
     constructor(string memory _name, string memory _symbol) ERC721(_name, _symbol) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(ADMIN_ROLE, msg.sender);
+
+        _grantRole(MINT_PHASE_ROLE, msg.sender);
+        _grantRole(BURN_PHASE_ROLE, msg.sender);
         _grantRole(BURN_ALL_ROLE, msg.sender);
         _grantRole(BURN_ONE_ROLE, msg.sender);
         _grantRole(WITHDRAW_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
-        _grantRole(ADMIN_ROLE, msg.sender);
     }
 
     /**
@@ -258,14 +263,14 @@ contract BoozeBearsAllowanceToken is
     /**
      * @dev flip the mint phase state
      */
-    function flipMintPhaseState() external onlyRole(ADMIN_ROLE) {
+    function flipMintPhaseState() external onlyRole(MINT_PHASE_ROLE) {
         mintPhaseState = !mintPhaseState;
     }
 
     /**
      * @dev flip the burn phase state
      */
-    function flipBurnPhaseState() external onlyRole(ADMIN_ROLE) {
+    function flipBurnPhaseState() external onlyRole(BURN_PHASE_ROLE) {
         burnPhaseState = !burnPhaseState;
     }
 
@@ -289,7 +294,7 @@ contract BoozeBearsAllowanceToken is
      * @param _start Timestamp to mark the start
      * @param _end Timestamp to mark the end
      */
-    function setMintSchedule(uint256 _start, uint256 _end) external onlyRole(ADMIN_ROLE) {
+    function setMintSchedule(uint256 _start, uint256 _end) external onlyRole(MINT_PHASE_ROLE) {
         require(_end >= _start || _start == 0 || _end == 0, BoozeBearsInvalidMintSchedule(_start, _end));
         mintSchedule.start = _start;
         mintSchedule.end = _end;
@@ -301,7 +306,7 @@ contract BoozeBearsAllowanceToken is
      * @param _start Timestamp to mark the start
      * @param _end Timestamp to mark the end
      */
-    function setBurnSchedule(uint256 _start, uint256 _end) external onlyRole(ADMIN_ROLE) {
+    function setBurnSchedule(uint256 _start, uint256 _end) external onlyRole(BURN_PHASE_ROLE) {
         require(_end >= _start || _start == 0 || _end == 0, BoozeBearsInvalidBurnSchedule(_start, _end));
         burnSchedule.start = _start;
         burnSchedule.end = _end;
