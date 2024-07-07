@@ -252,7 +252,7 @@ interface IGovernor is IERC165, IERC6372 {
     function proposalNeedsQueuing(uint256 proposalId) external view returns (bool);
 
     /**
-     * @notice module:user-config
+     * @notice module:user-wagmi
      * @dev Delay, between the proposal is created and the vote starts. The unit this duration is expressed in depends
      * on the clock (see EIP-6372) this contract uses.
      *
@@ -265,7 +265,7 @@ interface IGovernor is IERC165, IERC6372 {
     function votingDelay() external view returns (uint256);
 
     /**
-     * @notice module:user-config
+     * @notice module:user-wagmi
      * @dev Delay between the vote start and vote end. The unit this duration is expressed in depends on the clock
      * (see EIP-6372) this contract uses.
      *
@@ -279,7 +279,7 @@ interface IGovernor is IERC165, IERC6372 {
     function votingPeriod() external view returns (uint256);
 
     /**
-     * @notice module:user-config
+     * @notice module:user-wagmi
      * @dev Minimum number of cast voted required for a proposal to be successful.
      *
      * NOTE: The `timepoint` parameter corresponds to the snapshot used for counting vote. This allows to scale the

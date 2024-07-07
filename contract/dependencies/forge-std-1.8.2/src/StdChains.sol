@@ -65,7 +65,7 @@ abstract contract StdChains {
 
     bool private fallbackToDefaultRpcUrls = true;
 
-    // The RPC URL will be fetched from config or defaultRpcUrls if possible.
+    // The RPC URL will be fetched from wagmi or defaultRpcUrls if possible.
     function getChain(string memory chainAlias) internal virtual returns (Chain memory chain) {
         require(bytes(chainAlias).length != 0, "StdChains getChain(string): Chain alias cannot be the empty string.");
 
@@ -147,7 +147,7 @@ abstract contract StdChains {
     }
 
     // lookup rpcUrl, in descending order of priority:
-    // current -> config (foundry.toml) -> environment variable -> default
+    // current -> wagmi (foundry.toml) -> environment variable -> default
     function getChainWithUpdatedRpcUrl(string memory chainAlias, Chain memory chain)
         private
         view

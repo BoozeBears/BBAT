@@ -10,7 +10,7 @@ import "@openzeppelin-contracts-5.0.2/token/ERC721/extensions/ERC721Royalty.sol"
 import "@openzeppelin-contracts-5.0.2/token/ERC721/ERC721.sol";
 import "@openzeppelin-contracts-5.0.2/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin-contracts-5.0.2/utils/ReentrancyGuard.sol";
-import "./Errors.sol";
+import "./IBoozeBearsErrors.sol";
 import "./BoozeBearsAllowanceDelegate.sol";
 
 contract BoozeBearsAllowanceToken is
@@ -20,11 +20,13 @@ contract BoozeBearsAllowanceToken is
     ERC721Burnable,
     ERC721Royalty,
     ERC721Enumerable,
-    ReentrancyGuard
+    ReentrancyGuard,
+    IBoozeBearsErrors
 {
     using Strings for uint256;
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+
     bytes32 public constant BURN_ALL_ROLE = keccak256("BURN_ALL_ROLE");
     bytes32 public constant BURN_ONE_ROLE = keccak256("BURN_ONE_ROLE");
     bytes32 public constant WITHDRAW_ROLE = keccak256("WITHDRAW_ROLE");
@@ -39,11 +41,6 @@ contract BoozeBearsAllowanceToken is
      * @notice Holds the base URI for token metadata
      */
     string public baseURI;
-
-    /**
-     * @notice Holds the mint active state
-     */
-    bool public isMintActive = false;
 
     /**
      * @notice Token redirect contract
@@ -64,12 +61,22 @@ contract BoozeBearsAllowanceToken is
     }
 
     /**
-     * @dev ClaimSchedule defines start and end of the claim period
+     * @dev BurnSchedule defines start and end of the burn period
      */
-    struct ClaimSchedule {
+    struct BurnSchedule {
         uint256 start;
         uint256 end;
     }
+
+    /**
+     * @notice mintPhaseState defines if the mint phase is active or not
+     */
+    bool public mintPhaseState;
+
+    /**
+     * @notice burnPhaseState defines if the burn phase is active or not
+     */
+    bool public burnPhaseState;
 
     /**
      * @notice mintSchedule defines start and end of the mint period.
@@ -77,9 +84,9 @@ contract BoozeBearsAllowanceToken is
     MintSchedule public mintSchedule;
 
     /**
-     * @notice claimSchedule defines start and end of the claim period
+     * @notice burnSchedule defines start and end of the burn period
      */
-    ClaimSchedule public claimSchedule;
+    BurnSchedule public burnSchedule;
 
     /**
      * @dev Create new contract
@@ -130,14 +137,13 @@ contract BoozeBearsAllowanceToken is
      * @param _vault Wallet address which owns the token.
      *
      * Requirements:
-     * - block.timestamp must within mint schedule
+     * - mint phase must be active
      * - proofs must be verified
      * - destination can't be 0
      */
     function mint(bytes32[][] calldata _proofs, uint256[] calldata _tokenIds, address _vault)
         external
-        _checkMintActive
-        _checkMintSchedule
+        _isMintPhase
         _requireValidAddress(delegateContractAddress)
     {
         uint256 len = _tokenIds.length;
@@ -145,15 +151,16 @@ contract BoozeBearsAllowanceToken is
             if (_vault == address(0)) {
                 require(
                     _verifyWhitelist(_proofs[i], _tokenIds[i], msg.sender),
-                    Errors.SenderNotWhitelisted(msg.sender, _tokenIds[i])
+                    BoozeBearsSenderNotWhitelisted(msg.sender, _tokenIds[i])
                 );
             } else {
                 require(
-                    _verifyWhitelist(_proofs[i], _tokenIds[i], _vault), Errors.VaultNotWhitelisted(_vault, _tokenIds[i])
+                    _verifyWhitelist(_proofs[i], _tokenIds[i], _vault),
+                    BoozeBearsVaultNotWhitelisted(_vault, _tokenIds[i])
                 );
 
                 address delegateAddress = delegateContract.getAllowanceReceiver(_vault, _tokenIds[i]);
-                require(delegateAddress == msg.sender, Errors.NotDelegated(msg.sender, _vault, _tokenIds[i]));
+                require(delegateAddress == msg.sender, BoozeBearsNotDelegated(msg.sender, _vault, _tokenIds[i]));
             }
             _safeMint(msg.sender, _tokenIds[i]);
 
@@ -169,11 +176,12 @@ contract BoozeBearsAllowanceToken is
      * @param _tokenIds TokenIds which should be burned
      *
      * Requirements:
+     * - burn phase must be active
      * - must be authorized for all tokenIds
      */
-    function burnWithHash(uint256[] calldata _tokenIds, bytes32)
+    function burnBatchWithHash(uint256[] calldata _tokenIds, bytes32)
         external
-        _checkClaimSchedule
+        _isBurnPhase
         _checkAuthorizations(_tokenIds)
     {
         uint256 len = _tokenIds.length;
@@ -216,7 +224,7 @@ contract BoozeBearsAllowanceToken is
      * @param _merkleRoot MerkleRoot to persist
      */
     function setMerkleRoot(bytes32 _merkleRoot) external onlyRole(ADMIN_ROLE) {
-        require(_merkleRoot != bytes32(0), Errors.EmptyMerkleRoot(_merkleRoot));
+        require(_merkleRoot != bytes32(0), BoozeBearsEmptyMerkleRoot(_merkleRoot));
         merkleRoot = _merkleRoot;
     }
 
@@ -248,34 +256,55 @@ contract BoozeBearsAllowanceToken is
     }
 
     /**
+     * @dev flip the mint phase state
+     */
+    function flipMintPhaseState() external onlyRole(ADMIN_ROLE) {
+        mintPhaseState = !mintPhaseState;
+    }
+
+    /**
+     * @dev flip the burn phase state
+     */
+    function flipBurnPhaseState() external onlyRole(ADMIN_ROLE) {
+        burnPhaseState = !burnPhaseState;
+    }
+
+    /**
+     * @dev check if mint is active
+     */
+    function isMintActive() external view returns (bool) {
+        return _checkSchedule(mintSchedule.start, mintSchedule.end) && mintPhaseState;
+    }
+
+    /**
+     * @dev check if burn is active
+     */
+    function isBurnActive() external view returns (bool) {
+        return _checkSchedule(burnSchedule.start, burnSchedule.end) && burnPhaseState;
+    }
+
+    /**
      * @dev set mint schedule
      *
      * @param _start Timestamp to mark the start
      * @param _end Timestamp to mark the end
      */
     function setMintSchedule(uint256 _start, uint256 _end) external onlyRole(ADMIN_ROLE) {
-        require(_end >= _start || _start == 0 || _end == 0, Errors.InvalidMintSchedule(_start, _end));
+        require(_end >= _start || _start == 0 || _end == 0, BoozeBearsInvalidMintSchedule(_start, _end));
         mintSchedule.start = _start;
         mintSchedule.end = _end;
     }
 
     /**
-     * @dev set claim schedule
+     * @dev set burn schedule
      *
      * @param _start Timestamp to mark the start
      * @param _end Timestamp to mark the end
      */
-    function setClaimSchedule(uint256 _start, uint256 _end) external onlyRole(ADMIN_ROLE) {
-        require(_end >= _start || _start == 0 || _end == 0, Errors.InvalidClaimSchedule(_start, _end));
-        claimSchedule.start = _start;
-        claimSchedule.end = _end;
-    }
-
-    /**
-     * @dev flip mint active state
-     */
-    function flipMintActiveState() external onlyRole(ADMIN_ROLE) {
-        isMintActive = !isMintActive;
+    function setBurnSchedule(uint256 _start, uint256 _end) external onlyRole(ADMIN_ROLE) {
+        require(_end >= _start || _start == 0 || _end == 0, BoozeBearsInvalidBurnSchedule(_start, _end));
+        burnSchedule.start = _start;
+        burnSchedule.end = _end;
     }
 
     /**
@@ -308,39 +337,30 @@ contract BoozeBearsAllowanceToken is
      * @dev Check if address is valid ( != 0 )
      */
     modifier _requireValidAddress(address _addr) virtual {
-        require(_addr != address(0), Errors.InvalidAddress(_addr));
+        require(_addr != address(0), BoozeBearsInvalidAddress(_addr));
         _;
     }
 
     /**
-     * @dev Check if mint is active
+     * @dev check if schedule state
      */
-    modifier _checkMintActive() virtual {
-        require(isMintActive, Errors.MintIsNotActive());
-        _;
+    function _checkSchedule(uint256 _start, uint256 _end) internal view returns (bool) {
+        return (_start <= block.timestamp) && (_end >= block.timestamp);
     }
 
     /**
      * @dev Check if current block.timestamp is within our mint schedule
      */
-    modifier _checkMintSchedule() virtual {
-        require(
-            (mintSchedule.start == 0 || mintSchedule.start <= block.timestamp)
-                && (mintSchedule.end == 0 || mintSchedule.end >= block.timestamp),
-            Errors.MintScheduleIsNotActive()
-        );
+    modifier _isMintPhase() virtual {
+        require(this.isMintActive(), BoozeBearsMintScheduleNotActive());
         _;
     }
 
     /**
-     * @dev Check if current block.timestamp is within our claim schedule
+     * @dev Check if current block.timestamp is within our burn schedule
      */
-    modifier _checkClaimSchedule() virtual {
-        require(
-            (claimSchedule.start > 0 && claimSchedule.start <= block.timestamp)
-                && (claimSchedule.end > 0 && claimSchedule.end >= block.timestamp),
-            Errors.ClaimScheduleIsNotActive()
-        );
+    modifier _isBurnPhase() virtual {
+        require(this.isBurnActive(), BoozeBearsBurnScheduleNotActive());
         _;
     }
 
@@ -352,7 +372,7 @@ contract BoozeBearsAllowanceToken is
         for (uint256 i = 0; i < len;) {
             require(
                 _isAuthorized(_ownerOf(_tokenIds[i]), msg.sender, _tokenIds[i]),
-                Errors.NotAuthorizedForToken(_tokenIds[i])
+                BoozeBearsNotAuthorizedForToken(_tokenIds[i])
             );
             unchecked {
                 ++i;
