@@ -1,9 +1,9 @@
 "use client"
 
-export const runtime = 'edge';
+//export const runtime = 'edge';
 
 import {useState} from "react";
-import {useAccount, useReadContract, useWriteContract} from 'wagmi'
+import {useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract} from 'wagmi';
 
 import FormControl from '@mui/material/FormControl';
 import TextField from '@mui/material/TextField';
@@ -12,37 +12,51 @@ import ButtonGroup from '@mui/material/ButtonGroup';
 import Box from '@mui/material/Box';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SendIcon from '@mui/icons-material/Send';
+import LinearProgress from '@mui/material/LinearProgress';
 
-import abiDelegate from "@/abi/delegate";
+import delegateContract from "@/contract/delegate";
 
 export default function Delegate() {
-  const delegateContractAddress = process.env.NEXT_PUBLIC_DELEGATE_CONTRACT_ADDRESS;
 
   const account = useAccount();
-  const {data: hash, error, isPending, writeContract} = useWriteContract()
+  const {data: hash, error: writeContractError, isPending: writeContractIsPending, writeContract} = useWriteContract()
 
+  const {isLoading: isConfirming, isSuccess: isConfirmed} = useWaitForTransactionReceipt({
+    hash,
+  })
 
   const {
     data: delegateToAddress, error: getAllowanceReceiverError, isPending: getAllowanceReceiverIsPending
   } = useReadContract({
-    abi: abiDelegate, address: delegateContractAddress as `0x${string}`, functionName: 'getAllowanceReceiver', args: [account.address as `0x${string}`, BigInt(0)],
+    ...delegateContract, functionName: 'getDelegationReceiver', args: [account.address as `0x${string}`],
   })
 
   let changeDelegation = function (delegateTo: `0x${string}`) {
     writeContract({
-      abi: abiDelegate, address: delegateContractAddress as `0x${string}`, functionName: 'updateAllowanceReceiver', args: [delegateTo],
+      ...delegateContract, functionName: 'setDelegation', args: [delegateTo],
     })
   }
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  let resetDelegation = function () {
+    writeContract({
+      ...delegateContract, functionName: 'resetDelegation',
+    })
+  }
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     changeDelegation(hotAddress as `0x${string}`);
   }
 
+  async function handleReset(e: React.FormEvent<HTMLFormElement>)  {
+    e.preventDefault();
+    resetDelegation();
+  }
+
   const [hotAddress, setHotAddress] = useState("")
 
-  return (<form onSubmit={handleSubmit}>
-    <Box component="form" autoComplete="off">
+  return (<Box>
+    <Box component="form" autoComplete="off" onSubmit={handleSubmit} onReset={handleReset}>
       <FormControl fullWidth required>
         <TextField
           id="hot-address"
@@ -54,10 +68,15 @@ export default function Delegate() {
           onChange={e => setHotAddress(e.target.value)}
         />
         <ButtonGroup>
-          <Button type={"reset"} disabled={!account.isConnected || getAllowanceReceiverIsPending} variant="outlined" startIcon={<DeleteIcon/>}>Reset</Button>
-          <Button type={"submit"} disabled={!account.isConnected || getAllowanceReceiverIsPending} variant="contained" endIcon={<SendIcon/>}>Delegate</Button>
+          <Button type={"reset"} disabled={!account.isConnected || getAllowanceReceiverIsPending || writeContractIsPending || isConfirming} variant="outlined"
+                  startIcon={<DeleteIcon/>}>Reset</Button>
+          <Button type={"submit"} disabled={!account.isConnected || getAllowanceReceiverIsPending || writeContractIsPending || isConfirming} variant="contained"
+                  endIcon={<SendIcon/>}>Delegate</Button>
         </ButtonGroup>
       </FormControl>
     </Box>
-  </form>);
+    <Box hidden={!isConfirming}>
+      <LinearProgress/>
+    </Box>
+  </Box>);
 }

@@ -3,7 +3,7 @@
 import { defaultWagmiConfig } from '@web3modal/wagmi/react/config'
 
 import { http, createStorage } from 'wagmi'
-import { polygon, polygonAmoy } from 'wagmi/chains'
+import { polygonAmoy } from 'wagmi/chains'
 
 // Get projectId from https://cloud.walletconnect.com
 export const projectId = process.env.NEXT_PUBLIC_PROJECT_ID
@@ -18,17 +18,12 @@ const metadata = {
 }
 
 // Create wagmiConfig
-const chains = [polygon, polygonAmoy] as const
+const chains = [polygonAmoy] as const
 export const config = defaultWagmiConfig({
   chains,
   projectId,
   metadata,
-  ssr: true,
-  storage: createStorage({
-    storage: localStorage
-  }),
   transports: {
-    [polygon.id]: http(),
     [polygonAmoy.id]: http(),
   },
 })
