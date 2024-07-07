@@ -95,7 +95,7 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
         withinMintSchedule();
 
         vm.startPrank(mints[0].owner, mints[0].owner);
-        bbar.updateAllowanceReceiver(address(123));
+        bbar.setDelegation(address(123));
         vm.stopPrank();
 
         mintTokenWithDelegation(0, address(123), mints[0].owner);

@@ -1,112 +1,63 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import "@openzeppelin-contracts-5.0.2/utils/structs/EnumerableMap.sol";
+import "@openzeppelin-contracts-5.0.2/utils/structs/EnumerableSet.sol";
 
 contract BoozeBearsAllowanceDelegate {
-    using EnumerableMap for EnumerableMap.UintToAddressMap;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     /**
-     * Mapping for the RedirectConfig to a specific owner
+     * msg.sender => receiver
      */
-    struct AllowanceConfig {
-        mapping(address => RedirectConfig) ownerToRedirect;
-        mapping(address => RedirectConfig) allowanceMapping;
-    }
+    mapping(address => address) public delegationSenderReceiverMapping;
 
     /**
-     * Holds the redirect for one owner or specific tokens from one owner
+     * receiver => AddressSet
      */
-    struct RedirectConfig {
-        address redirectAllReceiver;
-        EnumerableMap.UintToAddressMap redirectTokens;
-    }
-
-    /**
-     * Holds the AllowanceRedirectConfig
-     */
-    AllowanceConfig internal allowanceConfig;
+    mapping(address => EnumerableSet.AddressSet) private delegationReceiverSendersMapping;
 
     constructor() {}
 
     /**
-     * @notice Update allowance receiver for msg.sender who should receive all allowances
+     * @notice Set delegation for msg.sender to receiver
      *
-     * @param receiver address of the receiver
+     * @param receiver address for delegation
      */
-    function updateAllowanceReceiver(address receiver) external {
-        allowanceConfig.allowanceMapping[msg.sender].redirectAllReceiver = receiver;
+    function setDelegation(address receiver) external {
+        delegationSenderReceiverMapping[msg.sender] = receiver;
+        delegationReceiverSendersMapping[receiver].add(msg.sender);
     }
 
     /**
-     * @notice Update allowance receiver for specific tokenIds
-     *
-     * @param tokenIds token id list which should be redirected
-     * @param receiver address of the receiver
+     * @notice Reset delegation
      */
-    function updateAllowanceReceiver(uint256[] calldata tokenIds, address receiver) external {
-        uint256 len = tokenIds.length;
-        for (uint256 i = 0; i < len;) {
-            allowanceConfig.allowanceMapping[msg.sender].redirectTokens.set(tokenIds[i], receiver);
+    function resetDelegation() external {
+        address delegatedTo = delegationSenderReceiverMapping[msg.sender];
 
-            unchecked {
-                ++i;
-            }
-        }
+        delete delegationSenderReceiverMapping[msg.sender];
+        delegationReceiverSendersMapping[delegatedTo].remove(msg.sender);
     }
 
     /**
-     * @notice Reset all allowance receivers for msg.sender
+     * @notice Get delegation receiver for holder
+     *
+     * @param holder address
      */
-    function resetAllowanceReceiver() external {
-        allowanceConfig.allowanceMapping[msg.sender].redirectAllReceiver = address(0);
-        uint256 len = allowanceConfig.allowanceMapping[msg.sender].redirectTokens.length();
-        uint256[] memory tokenIds = new uint256[](len);
-        for (uint256 i = 0; i < len;) {
-            (uint256 tokenId,) = allowanceConfig.allowanceMapping[msg.sender].redirectTokens.at(i);
-            tokenIds[i] = tokenId;
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        len = tokenIds.length;
-        for (uint256 i = 0; i < len;) {
-            allowanceConfig.allowanceMapping[msg.sender].redirectTokens.remove(tokenIds[i]);
-            unchecked {
-                ++i;
-            }
-        }
+    function getDelegationReceiver(address holder) external view returns (address) {
+        return delegationSenderReceiverMapping[holder];
     }
 
     /**
-     * @notice Reset allowance receiver for specific tokenIds
-     *
-     * @param tokenIds List of tokenIds which should be reset
+     * @notice Get delegation receiver for msg.sender
      */
-    function resetAllowanceReceiver(uint256[] calldata tokenIds) external {
-        uint256 len = tokenIds.length;
-        for (uint256 i = 0; i < len;) {
-            allowanceConfig.allowanceMapping[msg.sender].redirectTokens.remove(tokenIds[i]);
-            unchecked {
-                ++i;
-            }
-        }
+    function getDelegationReceiver() external view returns (address) {
+        return delegationSenderReceiverMapping[msg.sender];
     }
 
     /**
-     * @notice Get allowance receiver for a specific tokenId
-     *
-     * @param owner Token Owner
-     * @param tokenId Token Id
+     * @notice Get delegation senders for msg.sender
      */
-    function getAllowanceReceiver(address owner, uint256 tokenId) external view returns (address) {
-        address tokenAllowanceReceiver = allowanceConfig.allowanceMapping[owner].redirectAllReceiver;
-        if (tokenAllowanceReceiver != address(0)) {
-            return tokenAllowanceReceiver;
-        }
-        (, tokenAllowanceReceiver) = allowanceConfig.allowanceMapping[owner].redirectTokens.tryGet(tokenId);
-        return tokenAllowanceReceiver;
+    function getDelegationSenders() external view returns (address[] memory) {
+        return delegationReceiverSendersMapping[msg.sender].values();
     }
 }

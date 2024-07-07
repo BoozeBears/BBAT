@@ -164,7 +164,7 @@ contract BoozeBearsAllowanceToken is
                     BoozeBearsVaultNotWhitelisted(_vault, _tokenIds[i])
                 );
 
-                address delegateAddress = delegateContract.getAllowanceReceiver(_vault, _tokenIds[i]);
+                address delegateAddress = delegateContract.getDelegationReceiver(_vault);
                 require(delegateAddress == msg.sender, BoozeBearsNotDelegated(msg.sender, _vault, _tokenIds[i]));
             }
             _safeMint(msg.sender, _tokenIds[i]);
