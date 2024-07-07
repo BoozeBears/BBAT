@@ -96,7 +96,7 @@ contract BoozeBearsAllowanceDelegate {
     }
 
     /**
-     * @notice Get an allowance receiver for a specific tokenId
+     * @notice Get allowance receiver for a specific tokenId
      *
      * @param owner Token Owner
      * @param tokenId Token Id
