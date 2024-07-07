@@ -151,7 +151,13 @@ contract BoozeBearsAllowanceToken is
         _isMintPhase
         _requireValidAddress(delegateContractAddress)
     {
+        require(
+            _tokenIds.length > 0 && _proofs.length > 0 && _tokenIds.length == _proofs.length,
+            BoozeBearsInvalidProofsTokenIds()
+        );
+
         uint256 len = _tokenIds.length;
+
         for (uint256 i = 0; i < len;) {
             if (_vault == address(0)) {
                 require(

@@ -181,15 +181,11 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
         vm.stopPrank();
     }
 
-    function test_ExpectRevert_MintWithInvalidProofs() external {
+    function test_ExpectRevert_BoozeBearsNoTokensToMint() external {
         withinMintSchedule();
 
-        vm.startPrank(mints[0].owner, mints[0].owner);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IBoozeBearsErrors.BoozeBearsSenderNotWhitelisted.selector, mints[0].owner, mints[0].tokenIds[0]
-            )
-        );
+        vm.startPrank(address(123), address(123));
+        vm.expectRevert(IBoozeBearsErrors.BoozeBearsInvalidProofsTokenIds.selector);
         bbat.mint(mints[1].proofs, mints[0].tokenIds, address(0));
         vm.stopPrank();
     }
@@ -197,13 +193,16 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
     function test_ExpectRevert_MintNotOnAllowlist() external {
         withinMintSchedule();
 
+        mints[0].proofs[0].pop();
+        bytes32[][] memory proofs = mints[0].proofs;
+
         vm.startPrank(address(123), address(123));
         vm.expectRevert(
             abi.encodeWithSelector(
                 IBoozeBearsErrors.BoozeBearsSenderNotWhitelisted.selector, address(123), mints[0].tokenIds[0]
             )
         );
-        bbat.mint(mints[1].proofs, mints[0].tokenIds, address(0));
+        bbat.mint(proofs, mints[0].tokenIds, address(0));
         vm.stopPrank();
     }
 
@@ -216,7 +215,7 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
                 IBoozeBearsErrors.BoozeBearsVaultNotWhitelisted.selector, address(12345), mints[0].tokenIds[0]
             )
         );
-        bbat.mint(mints[1].proofs, mints[0].tokenIds, address(12345));
+        bbat.mint(mints[0].proofs, mints[0].tokenIds, address(12345));
         vm.stopPrank();
     }
 

@@ -19,5 +19,6 @@ interface IBoozeBearsErrors {
     error BoozeBearsVaultNotWhitelisted(address _vault, uint256 _tokenId);
     error BoozeBearsNotDelegated(address _sender, address _vault, uint256 _tokenId);
     error BoozeBearsNotAuthorizedForToken(uint256 _tokenId);
-  error BoozeBearsNoCallsFromOtherContract();
+    error BoozeBearsNoCallsFromOtherContract();
+    error BoozeBearsInvalidProofsTokenIds();
 }

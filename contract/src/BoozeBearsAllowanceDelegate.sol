@@ -68,14 +68,14 @@ contract BoozeBearsAllowanceDelegate is IBoozeBearsErrors {
      * @notice Get delegation senders for msg.sender
      */
     function getDelegationSenders() external view returns (address[] memory) {
-      return delegationReceiverSendersMapping[msg.sender].values();
+        return delegationReceiverSendersMapping[msg.sender].values();
     }
 
     /**
      * @dev do not allow to be called from another contract
      */
     modifier noContractCalls() virtual {
-      require(msg.sender == tx.origin, BoozeBearsNoCallsFromOtherContract());
-      _;
+        require(msg.sender == tx.origin, BoozeBearsNoCallsFromOtherContract());
+        _;
     }
 }
