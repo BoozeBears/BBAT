@@ -18,7 +18,7 @@ contract BoozeBearsAllowanceDelegateTest is Test {
     }
 
     function test_setDelegation() external {
-        vm.startPrank(delegationSender1);
+        vm.startPrank(delegationSender1, delegationSender1);
 
         delegationContract.setDelegation(delegationReceiver);
         assertEq(delegationReceiver, delegationContract.getDelegationReceiver(delegationSender1));
@@ -27,7 +27,7 @@ contract BoozeBearsAllowanceDelegateTest is Test {
     }
 
     function test_resetDelegation() external {
-        vm.startPrank(delegationSender1);
+        vm.startPrank(delegationSender1, delegationSender1);
 
         delegationContract.setDelegation(delegationReceiver);
         assertEq(delegationReceiver, delegationContract.getDelegationReceiver(delegationSender1));
@@ -39,7 +39,7 @@ contract BoozeBearsAllowanceDelegateTest is Test {
     }
 
     function test_getDelegationReceiverMsgSender() external {
-        vm.startPrank(delegationSender1);
+        vm.startPrank(delegationSender1, delegationSender1);
 
         delegationContract.setDelegation(delegationReceiver);
         assertEq(delegationReceiver, delegationContract.getDelegationReceiver());
@@ -53,7 +53,7 @@ contract BoozeBearsAllowanceDelegateTest is Test {
         configuredDelegationSenders[1] = delegationSender2;
 
         for (uint256 i = 0; i < configuredDelegationSenders.length; i++) {
-            vm.startPrank(configuredDelegationSenders[i]);
+            vm.startPrank(configuredDelegationSenders[i], configuredDelegationSenders[i]);
             delegationContract.setDelegation(delegationReceiver);
             vm.stopPrank();
         }
