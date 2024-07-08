@@ -12,7 +12,7 @@ import {IERC721Errors} from "@openzeppelin-contracts-5.0.2/interfaces/draft-IERC
 contract BoozeBearsAllowanceTokenTest is Test, Pausable {
     Utils internal utils;
     BoozeBearsAllowanceToken internal bbat;
-    BoozeBearsAllowanceDelegate internal bbar;
+    BoozeBearsAllowanceDelegate internal bbad;
 
     struct Mint {
         address owner;
@@ -40,11 +40,24 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
         assertEq(bbat.name(), "BoozeBearsAllowanceToken");
         assertEq(bbat.symbol(), "BBAT");
 
-        bbar = new BoozeBearsAllowanceDelegate();
+        bbad = new BoozeBearsAllowanceDelegate();
 
-        bbat.setDelegateContractAddress(address(bbar));
+        bbat.setDelegateContractAddress(address(bbad));
         bbat.setMerkleRoot(merkleRoot);
 
+        vm.stopPrank();
+    }
+
+    function test_construct() external {
+        vm.startPrank(admin);
+        BoozeBearsAllowanceToken testContract = new BoozeBearsAllowanceToken("BoozeBearsAllowanceToken", "BBAT");
+        assertTrue(testContract.hasRole(keccak256("ADMIN_ROLE"), admin));
+        assertTrue(testContract.hasRole(keccak256("MINT_PHASE_ROLE"), admin));
+        assertTrue(testContract.hasRole(keccak256("BURN_PHASE_ROLE"), admin));
+        assertTrue(testContract.hasRole(keccak256("BURN_ALL_ROLE"), admin));
+        assertTrue(testContract.hasRole(keccak256("BURN_ONE_ROLE"), admin));
+        assertTrue(testContract.hasRole(keccak256("WITHDRAW_ROLE"), admin));
+        assertTrue(testContract.hasRole(keccak256("PAUSER_ROLE"), admin));
         vm.stopPrank();
     }
 
@@ -53,7 +66,12 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
         bbat.setBaseURI("https://boozebears.io/");
         vm.stopPrank();
 
+        withinMintSchedule();
+
+        mintToken(1);
+
         assertEq(bbat.baseURI(), "https://boozebears.io/");
+        assertEq(bbat.tokenURI(mints[1].tokenIds[0]), "https://boozebears.io/253.json");
     }
 
     /**
@@ -95,7 +113,7 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
         withinMintSchedule();
 
         vm.startPrank(mints[0].owner, mints[0].owner);
-        bbar.setDelegation(address(123));
+        bbad.setDelegation(address(123));
         vm.stopPrank();
 
         mintTokenWithDelegation(0, address(123), mints[0].owner);
