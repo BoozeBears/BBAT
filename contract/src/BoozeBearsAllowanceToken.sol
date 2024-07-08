@@ -6,6 +6,7 @@ import "@openzeppelin-contracts-5.0.2/token/ERC721/extensions/ERC721Pausable.sol
 import "@openzeppelin-contracts-5.0.2/access/AccessControl.sol";
 import "@openzeppelin-contracts-5.0.2/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin-contracts-5.0.2/utils/cryptography/MerkleProof.sol";
+import "@openzeppelin-contracts-5.0.2/utils/structs/EnumerableSet.sol";
 import "@openzeppelin-contracts-5.0.2/token/ERC721/extensions/ERC721Royalty.sol";
 import "@openzeppelin-contracts-5.0.2/token/ERC721/ERC721.sol";
 import "@openzeppelin-contracts-5.0.2/token/ERC721/extensions/ERC721Enumerable.sol";
@@ -24,6 +25,7 @@ contract BoozeBearsAllowanceToken is
     IBoozeBearsErrors
 {
     using Strings for uint256;
+    using EnumerableSet for EnumerableSet.UintSet;
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
@@ -89,6 +91,8 @@ contract BoozeBearsAllowanceToken is
      * @notice burnSchedule defines start and end of the burn period
      */
     BurnSchedule public burnSchedule;
+
+    EnumerableSet.UintSet private mintedTokens;
 
     /**
      * @dev Create new contract
@@ -159,6 +163,8 @@ contract BoozeBearsAllowanceToken is
         uint256 len = _tokenIds.length;
 
         for (uint256 i = 0; i < len;) {
+            require(!mintedTokens.contains(_tokenIds[i]), BoozeBearsTokenAlreadyMinted(_tokenIds[i]));
+
             if (_vault == address(0)) {
                 require(
                     _verifyWhitelist(_proofs[i], _tokenIds[i], msg.sender),
@@ -173,6 +179,7 @@ contract BoozeBearsAllowanceToken is
                 address delegateAddress = delegateContract.getDelegationReceiver(_vault);
                 require(delegateAddress == msg.sender, BoozeBearsNotDelegated(msg.sender, _vault, _tokenIds[i]));
             }
+            mintedTokens.add(_tokenIds[i]);
             _safeMint(msg.sender, _tokenIds[i]);
 
             unchecked {
@@ -253,6 +260,16 @@ contract BoozeBearsAllowanceToken is
      */
     function withdraw() external onlyRole(WITHDRAW_ROLE) nonReentrant {
         payable(msg.sender).transfer(address(this).balance);
+    }
+
+    /**
+     * @dev Set default royalty
+     *
+     * @param receiver cannot be the zero address.
+     * @param feeNumerator cannot be greater than the fee denominator
+     */
+    function setDefaultRoyalty(address receiver, uint96 feeNumerator) external onlyRole(ADMIN_ROLE) {
+        _setDefaultRoyalty(receiver, feeNumerator);
     }
 
     /**

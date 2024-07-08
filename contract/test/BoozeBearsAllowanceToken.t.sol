@@ -105,7 +105,9 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
         withinMintSchedule();
 
         mintToken(1);
-        vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721InvalidSender.selector, address(0)));
+        vm.expectRevert(
+            abi.encodeWithSelector(IBoozeBearsErrors.BoozeBearsTokenAlreadyMinted.selector, mints[1].tokenIds[0])
+        );
         mintToken(1);
     }
 
@@ -155,6 +157,21 @@ contract BoozeBearsAllowanceTokenTest is Test, Pausable {
         vm.startPrank(mints[0].owner);
         bbat.burnBatchWithHash(mints[0].tokenIds, bytes32("Some Hash"));
         vm.stopPrank();
+    }
+
+    function test_ExpectRevert_BurnOwnedAndMintAgain() external {
+        withinMintSchedule();
+        mintToken(0);
+
+        withinBurnSchedule();
+        vm.startPrank(mints[0].owner);
+        bbat.burnBatchWithHash(mints[0].tokenIds, bytes32("Some Hash"));
+        vm.stopPrank();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IBoozeBearsErrors.BoozeBearsTokenAlreadyMinted.selector, mints[0].tokenIds[0])
+        );
+        mintToken(0);
     }
 
     function test_burnOne() external {

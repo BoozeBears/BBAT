@@ -21,4 +21,5 @@ interface IBoozeBearsErrors {
     error BoozeBearsNotAuthorizedForToken(uint256 _tokenId);
     error BoozeBearsNoCallsFromOtherContract();
     error BoozeBearsInvalidProofsTokenIds();
+    error BoozeBearsTokenAlreadyMinted(uint256 _tokenId);
 }
