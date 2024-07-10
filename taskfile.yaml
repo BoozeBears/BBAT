@@ -1,0 +1,14 @@
+version: '3'
+
+tasks:
+  contract-coverage:
+    dir: contract/
+    cmds:
+      - forge coverage --ir-minimum --report lcov
+      - genhtml lcov.info -o report --branch-coverage --rc derive_function_end_line=0
+
+  contract-deploy:
+    dir: contract/
+    cmds:
+      - forge script --chain amoy script/BoozeBearsAllowanceToken.s.sol:BoozeBearsAllowanceTokenScript --rpc-url $AMOY_RPC_URL --broadcast --verify -vvvv --with-gas-price 60gwei --priority-gas-price 30gwei
+      - forge script --chain amoy script/BoozeBearsAllowanceDelegate.s.sol:BoozeBearsAllowanceDelegateScript --rpc-url $AMOY_RPC_URL --broadcast --verify -vvvv --with-gas-price 60gwei --priority-gas-price 30gwei
