@@ -1,5 +1,4 @@
-// SPDX-License-Identifier: MIT
-// Compatible with OpenZeppelin Contracts ^5.0.0
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
 import "@openzeppelin-contracts-5.0.2/token/ERC721/extensions/ERC721Pausable.sol";
