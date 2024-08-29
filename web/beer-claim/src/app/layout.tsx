@@ -8,6 +8,7 @@ import theme from '@/theme';
 import Web3ModalProvider from '@/provider'
 import Box from "@mui/material/Box";
 import Header from "@/components/header";
+import Footer from '@/components/footer';
 import Toolbar from "@mui/material/Toolbar";
 
 export default function RootLayout(props: { children: React.ReactNode }) {
@@ -29,6 +30,9 @@ export default function RootLayout(props: { children: React.ReactNode }) {
               <Box sx={{ flexGrow: 1 }}>
                 {props.children}
               </Box>
+            </Box>
+            <Box>
+              <Footer/>
             </Box>
           </Box>
         </Web3ModalProvider>

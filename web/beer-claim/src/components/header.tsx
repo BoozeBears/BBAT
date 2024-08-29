@@ -9,9 +9,6 @@ import {useAccount, useReadContract} from "wagmi";
 import tokenContract from "@/contract/token";
 
 export default function Header() {
-  const tokenContractAddress = process.env.NEXT_PUBLIC_TOKEN_CONTRACT_ADDRESS;
-  const delegateContractAddress = process.env.NEXT_PUBLIC_DELEGATE_CONTRACT_ADDRESS;
-
   const pathname = usePathname()
   const account = useAccount();
 
@@ -36,14 +33,6 @@ export default function Header() {
           </Link>
           <Link href="/admin" hidden={!hasRoleAdmin}>
             <Button key="admin" variant={`${pathname === '/admin' ? 'contained' : 'outlined'}`}>Admin</Button>
-          </Link>
-        </Box>
-        <Box>
-          <Link target={"_blank"} href={`https://amoy.polygonscan.com/address/${tokenContractAddress}`}>
-            <Button>Token Contract</Button>
-          </Link>
-          <Link target={"_blank"} href={`https://amoy.polygonscan.com/address/${delegateContractAddress}`}>
-            <Button>Delegate Contract</Button>
           </Link>
         </Box>
         <Connect/>
