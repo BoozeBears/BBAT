@@ -23,7 +23,7 @@
     "@openzeppelin/merkle-tree": "^1.0.6",
     "@tanstack/react-query": "^5.50.1",
     "@web3modal/wagmi": "^5.0.6",
-    "dayjs": "^1.11.11",
+    "dayjs": "^1.11.13",
     "next": "14.2.4",
     "react": "^18",
     "react-dom": "^18",
